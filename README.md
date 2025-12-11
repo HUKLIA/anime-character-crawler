@@ -1,17 +1,57 @@
 # Anime Character Crawler
 
-A web crawler tool to search and collect anime character images with pagination support - displaying 20 images per page.
+A user-friendly desktop application to search and collect anime character images with pagination support - displaying 20 images per page.
 
 ## Features
 
-- **HTML Scraping**: Parses anime images directly from booru-style websites (non-API approach)
-- **Playwright Integration**: Handles JavaScript-rendered pages and Cloudflare protection
+- **Desktop GUI Application**: Easy-to-use interface - no command line needed!
+- **Search with Autocomplete**: Type character names and get tag suggestions
 - **Multi-Site Support**: Works with Danbooru, Safebooru, and Gelbooru
+- **Tag Filtering**: Filter by character, series, artist, and more
+- **Image Preview**: See thumbnails before downloading
 - **Image Deduplication**: Uses perceptual hashing (pHash) to detect duplicate images
-- **Polite Crawling**: Respects robots.txt, implements rate limiting and auto-throttling
-- **Pagination**: Displays 20 images per page with full pagination support
+- **One-Click Download**: Automatically downloads images to your chosen folder
+- **Dark Theme**: Beautiful modern dark interface
 
-## Installation
+## Quick Start (GUI Application)
+
+### Option 1: Run the App (Recommended)
+
+```bash
+# Clone and setup
+git clone https://github.com/HUKLIA/anime-character-crawler.git
+cd anime-character-crawler
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python app.py
+```
+
+### Option 2: Build Standalone Executable
+
+```bash
+# Build the .exe (Windows) or executable (Mac/Linux)
+python build_exe.py
+
+# Find your executable in:
+# Windows: dist/AnimeCharacterCrawler/AnimeCharacterCrawler.exe
+# Mac/Linux: dist/AnimeCharacterCrawler/AnimeCharacterCrawler
+```
+
+## How to Use the App
+
+1. **Search**: Type character names or tags in the search bar (e.g., `hatsune_miku`, `blue_hair`)
+2. **Quick Tags**: Click colorful tag buttons to add common search terms
+3. **Choose Site**: Select Danbooru, Safebooru, or Gelbooru from dropdown
+4. **Set Pages**: Choose how many pages to fetch (more pages = more images)
+5. **Click Search**: Watch as images appear in the grid!
+6. **Filter by Tags**: Use the left panel to filter by character, series, or artist
+7. **View Images**: Click any image to open it in your browser
+8. **Right-Click**: Copy URL or open downloaded file
+
+## Installation (Detailed)
 
 ### Quick Setup
 
@@ -84,21 +124,29 @@ scrapy crawl booru_html -a tags="1girl" -a max_pages=10 -a site=safebooru
 
 ```
 anime-character-crawler/
-├── anime_scraper/
+├── gui/                      # Desktop GUI application
 │   ├── __init__.py
-│   ├── items.py          # Data models
-│   ├── middlewares.py    # Request/response processing
-│   ├── pipelines.py      # Item processing (dedup, download)
-│   ├── settings.py       # Scrapy configuration
+│   ├── main_window.py        # Main application window
+│   ├── search_widget.py      # Search bar with autocomplete
+│   ├── image_grid.py         # Image display grid
+│   ├── tag_panel.py          # Tag filtering panel
+│   ├── settings_dialog.py    # Settings configuration
+│   ├── crawler_thread.py     # Background crawler
+│   └── styles.py             # UI styling
+├── anime_scraper/            # Scrapy crawler (advanced)
+│   ├── __init__.py
+│   ├── items.py              # Data models
+│   ├── middlewares.py        # Request/response processing
+│   ├── pipelines.py          # Item processing (dedup, download)
+│   ├── settings.py           # Scrapy configuration
 │   └── spiders/
-│       └── booru_html.py # Main spider
-├── downloaded_images/    # Downloaded images (created on run)
-├── output/               # JSON exports (created on run)
-├── data/                 # Hash database (created on run)
+│       └── booru_html.py     # Main spider
+├── app.py                    # GUI application entry point
+├── build_exe.py              # Build executable script
+├── run_crawler.py            # CLI entry point
 ├── requirements.txt
 ├── scrapy.cfg
 ├── setup.sh
-├── run_crawler.py
 └── README.md
 ```
 

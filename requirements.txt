@@ -1,5 +1,10 @@
 # Anime Image Crawler Dependencies
-# Core crawling framework
+
+# ===== GUI Framework =====
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+
+# ===== Core crawling framework =====
 scrapy>=2.11.0
 
 # Browser automation for JavaScript rendering and Cloudflare bypass
@@ -17,3 +22,7 @@ twisted[tls]>=23.0.0
 
 # Additional utilities
 python-dateutil>=2.8.2
+requests>=2.31.0
+
+# ===== Build Tools (for creating .exe) =====
+pyinstaller>=6.0.0

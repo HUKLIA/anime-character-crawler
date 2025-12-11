@@ -1,0 +1,19 @@
+# Anime Image Crawler Dependencies
+# Core crawling framework
+scrapy>=2.11.0
+
+# Browser automation for JavaScript rendering and Cloudflare bypass
+scrapy-playwright>=0.0.40
+playwright>=1.40.0
+
+# Image deduplication using perceptual hashing
+imagededup>=0.3.2
+
+# Image processing
+Pillow>=10.0.0
+
+# Async support
+twisted[tls]>=23.0.0
+
+# Additional utilities
+python-dateutil>=2.8.2

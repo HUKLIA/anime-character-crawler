@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QFrame, QGroupBox, QFlowLayout
+    QScrollArea, QFrame, QGroupBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont

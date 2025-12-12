@@ -38,7 +38,7 @@ class ImageCard(QFrame):
 
     def _init_ui(self):
         """Initialize the card UI."""
-        self.setFixedSize(220, 300)
+        self.setFixedSize(300, 400)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet("""
             QFrame {
@@ -57,7 +57,7 @@ class ImageCard(QFrame):
 
         # Thumbnail container
         thumb_container = QFrame()
-        thumb_container.setFixedSize(204, 180)
+        thumb_container.setFixedSize(284, 280)
         thumb_container.setStyleSheet("""
             QFrame {
                 background-color: #1a1a2e;
@@ -70,7 +70,7 @@ class ImageCard(QFrame):
 
         # Thumbnail image
         self.thumb_label = QLabel()
-        self.thumb_label.setFixedSize(204, 180)
+        self.thumb_label.setFixedSize(284, 280)
         self.thumb_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumb_label.setStyleSheet("background: transparent; border: none;")
         self.thumb_label.setText("Loading...")
@@ -178,7 +178,7 @@ class ImageCard(QFrame):
         """Set and scale the thumbnail pixmap."""
         self._pixmap = pixmap
         scaled = pixmap.scaled(
-            204, 180,
+            284, 280,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         )
@@ -252,7 +252,7 @@ class ImageGrid(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.image_cards: List[ImageCard] = []
-        self.columns = 4
+        self.columns = 3
         self._init_ui()
 
     def _init_ui(self):

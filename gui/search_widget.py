@@ -41,32 +41,27 @@ class SearchWidget(QWidget):
     def _init_ui(self):
         """Initialize the user interface."""
         layout = QVBoxLayout(self)
-        layout.setSpacing(16)
+        layout.setSpacing(8)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Title section
+        # Title section - more compact
         title_label = QLabel("🎨 Anime Image Crawler")
-        title_label.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: #e94560; margin-bottom: 8px;")
+        title_label.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #e94560;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
-
-        subtitle_label = QLabel("Search and download anime images from popular booru sites")
-        subtitle_label.setStyleSheet("color: #a0a0a0; font-size: 14px; margin-bottom: 16px;")
-        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(subtitle_label)
 
         # Search bar section
         search_frame = QFrame()
         search_frame.setStyleSheet("""
             QFrame {
                 background-color: #16213e;
-                border-radius: 16px;
-                padding: 16px;
+                border-radius: 12px;
+                padding: 12px;
             }
         """)
         search_layout = QVBoxLayout(search_frame)
-        search_layout.setSpacing(12)
+        search_layout.setSpacing(8)
 
         # Main search row
         search_row = QHBoxLayout()
@@ -74,15 +69,15 @@ class SearchWidget(QWidget):
 
         # Search input
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Enter character name, tags, or series... (e.g., hatsune_miku, blue_hair)")
-        self.search_input.setMinimumHeight(50)
+        self.search_input.setPlaceholderText("🔍 Enter character name, tags, or series...")
+        self.search_input.setMinimumHeight(38)
         self.search_input.setStyleSheet("""
             QLineEdit {
                 background-color: #1a1a2e;
                 border: 2px solid #2a2a4a;
-                border-radius: 25px;
-                padding: 12px 24px;
-                font-size: 15px;
+                border-radius: 19px;
+                padding: 8px 18px;
+                font-size: 13px;
                 color: #ffffff;
             }
             QLineEdit:focus {
@@ -93,15 +88,15 @@ class SearchWidget(QWidget):
 
         # Search button
         self.search_btn = QPushButton("Search")
-        self.search_btn.setMinimumSize(120, 50)
+        self.search_btn.setMinimumSize(90, 38)
         self.search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.search_btn.setStyleSheet("""
             QPushButton {
                 background-color: #e94560;
                 color: white;
                 border: none;
-                border-radius: 25px;
-                font-size: 15px;
+                border-radius: 19px;
+                font-size: 13px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -120,19 +115,20 @@ class SearchWidget(QWidget):
 
         # Suggestion list (hidden by default)
         self.suggestion_list = QListWidget()
-        self.suggestion_list.setMaximumHeight(200)
+        self.suggestion_list.setMaximumHeight(150)
         self.suggestion_list.setVisible(False)
         self.suggestion_list.setStyleSheet("""
             QListWidget {
                 background-color: #1a1a2e;
                 border: 2px solid #e94560;
-                border-radius: 12px;
-                padding: 8px;
+                border-radius: 8px;
+                padding: 4px;
             }
             QListWidget::item {
-                padding: 10px;
-                border-radius: 8px;
+                padding: 6px;
+                border-radius: 4px;
                 color: #ffffff;
+                font-size: 12px;
             }
             QListWidget::item:hover {
                 background-color: rgba(233, 69, 96, 0.3);
@@ -143,52 +139,53 @@ class SearchWidget(QWidget):
         """)
         search_layout.addWidget(self.suggestion_list)
 
-        # Filter row
+        # Filter row - more compact
         filter_row = QHBoxLayout()
-        filter_row.setSpacing(16)
+        filter_row.setSpacing(10)
 
         # Site selector
         site_label = QLabel("Site:")
-        site_label.setStyleSheet("color: #a0a0a0;")
+        site_label.setStyleSheet("color: #a0a0a0; font-size: 12px;")
         filter_row.addWidget(site_label)
 
         self.site_combo = QComboBox()
-        self.site_combo.addItems(["Danbooru", "Safebooru", "Gelbooru", "Konachan", "Yande.re", "Zerochan", "Anime-Pictures"])
-        self.site_combo.setMinimumWidth(150)
+        self.site_combo.addItems(["Danbooru", "Safebooru", "Gelbooru", "Konachan", "Yande.re", "Zerochan", "Anime-Pictures", "Pixiv"])
+        self.site_combo.setMinimumWidth(120)
         self.site_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         filter_row.addWidget(self.site_combo)
 
-        filter_row.addSpacing(20)
+        filter_row.addSpacing(10)
 
         # Rating filter
         rating_label = QLabel("Rating:")
-        rating_label.setStyleSheet("color: #a0a0a0;")
+        rating_label.setStyleSheet("color: #a0a0a0; font-size: 12px;")
         filter_row.addWidget(rating_label)
 
         self.rating_combo = QComboBox()
         self.rating_combo.addItems(["General (Safe)", "All Ratings"])
-        self.rating_combo.setMinimumWidth(140)
+        self.rating_combo.setMinimumWidth(110)
         self.rating_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         filter_row.addWidget(self.rating_combo)
 
-        filter_row.addSpacing(20)
+        filter_row.addSpacing(10)
 
         # Max pages
         pages_label = QLabel("Pages:")
-        pages_label.setStyleSheet("color: #a0a0a0;")
+        pages_label.setStyleSheet("color: #a0a0a0; font-size: 12px;")
         filter_row.addWidget(pages_label)
 
         self.pages_spin = QSpinBox()
         self.pages_spin.setRange(1, 50)
         self.pages_spin.setValue(5)
-        self.pages_spin.setMinimumWidth(80)
+        self.pages_spin.setMinimumWidth(60)
         self.pages_spin.setStyleSheet("""
             QSpinBox {
                 background-color: #1a1a2e;
                 border: 2px solid #2a2a4a;
-                border-radius: 8px;
-                padding: 8px;
+                border-radius: 6px;
+                padding: 4px;
                 color: #ffffff;
+                font-size: 12px;
             }
             QSpinBox:focus {
                 border-color: #e94560;
@@ -196,24 +193,25 @@ class SearchWidget(QWidget):
         """)
         filter_row.addWidget(self.pages_spin)
 
-        filter_row.addSpacing(20)
+        filter_row.addSpacing(10)
 
         # Download checkbox
-        self.download_check = QCheckBox("Download Images")
+        self.download_check = QCheckBox("Download")
         self.download_check.setChecked(False)  # Disabled by default
         self.download_check.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.download_check.setStyleSheet("font-size: 12px;")
         filter_row.addWidget(self.download_check)
 
         filter_row.addStretch()
 
         search_layout.addLayout(filter_row)
 
-        # Quick tag buttons
+        # Quick tag buttons - more compact
         quick_tags_layout = QHBoxLayout()
-        quick_tags_layout.setSpacing(8)
+        quick_tags_layout.setSpacing(6)
 
-        quick_label = QLabel("Quick Tags:")
-        quick_label.setStyleSheet("color: #a0a0a0; margin-right: 8px;")
+        quick_label = QLabel("Quick:")
+        quick_label.setStyleSheet("color: #a0a0a0; font-size: 11px;")
         quick_tags_layout.addWidget(quick_label)
 
         quick_tags = [
@@ -232,9 +230,9 @@ class SearchWidget(QWidget):
                     background-color: rgba({self._hex_to_rgb(color)}, 0.2);
                     color: {color};
                     border: 1px solid {color};
-                    border-radius: 12px;
-                    padding: 6px 14px;
-                    font-size: 12px;
+                    border-radius: 10px;
+                    padding: 4px 10px;
+                    font-size: 11px;
                 }}
                 QPushButton:hover {{
                     background-color: {color};
@@ -386,8 +384,8 @@ class SearchWidget(QWidget):
                     background-color: #ff4757;
                     color: white;
                     border: none;
-                    border-radius: 25px;
-                    font-size: 15px;
+                    border-radius: 19px;
+                    font-size: 13px;
                     font-weight: bold;
                 }
                 QPushButton:hover {
@@ -405,8 +403,8 @@ class SearchWidget(QWidget):
                     background-color: #e94560;
                     color: white;
                     border: none;
-                    border-radius: 25px;
-                    font-size: 15px;
+                    border-radius: 19px;
+                    font-size: 13px;
                     font-weight: bold;
                 }
                 QPushButton:hover {

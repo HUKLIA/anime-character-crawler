@@ -22,6 +22,7 @@ from .image_grid import ImageGrid
 from .tag_panel import TagPanel
 from .settings_dialog import SettingsDialog
 from .crawler_thread import CrawlerThread, ImageResult
+from .image_detail_dialog import ImageDetailDialog
 from .styles import AppStyles
 
 
@@ -299,11 +300,9 @@ class MainWindow(QMainWindow):
             self.search_widget.search_input.setFocus()
 
     def _on_image_clicked(self, image_result: ImageResult):
-        """Handle image click."""
-        # Open in browser
-        url = image_result.page_url or image_result.image_url
-        if url:
-            QDesktopServices.openUrl(QUrl(url))
+        """Handle image click - show detail popup."""
+        dialog = ImageDetailDialog(image_result, self)
+        dialog.exec()
 
     def _show_settings(self):
         """Show settings dialog."""

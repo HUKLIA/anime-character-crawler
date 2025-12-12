@@ -121,6 +121,8 @@ class CrawlerThread(QThread):
                 total_images = self._crawl_zerochan()
             elif self.site == "anime-pictures":
                 total_images = self._crawl_anime_pictures()
+            elif self.site == "pixiv":
+                total_images = self._crawl_pixiv()
             else:
                 total_images = self._crawl_danbooru()
 
@@ -718,6 +720,130 @@ class CrawlerThread(QThread):
 
             except Exception as e:
                 self.error.emit(f"Error on page {page + 1}: {str(e)}")
+                continue
+
+        return total_images
+
+    def _crawl_pixiv(self) -> int:
+        """Crawl images from Pixiv using public search."""
+        # Note: Pixiv has limited public access. Using their public artwork listing
+        base_url = "https://www.pixiv.net"
+        total_images = 0
+
+        search_term = self.search_tags.replace(" ", "%20")
+
+        for page in range(1, self.max_pages + 1):
+            if self.is_cancelled():
+                break
+
+            self.progress.emit(page, self.max_pages, f"Fetching page {page}...")
+
+            try:
+                # Use Pixiv's public JSON endpoint for artwork search
+                api_url = f"https://www.pixiv.net/ajax/search/artworks/{search_term}"
+                params = {
+                    "word": self.search_tags,
+                    "order": "date_d",
+                    "mode": "safe" if self.rating_filter == "general" else "all",
+                    "p": page,
+                    "s_mode": "s_tag",
+                    "type": "all"
+                }
+
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://www.pixiv.net/",
+                    "Accept": "application/json"
+                }
+
+                response = requests.get(api_url, params=params, headers=headers, timeout=30)
+
+                # Check if we got a valid response
+                if response.status_code == 403 or response.status_code == 401:
+                    self.error.emit("Pixiv requires login for search. Try using other sites.")
+                    break
+
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Check for error in response
+                if data.get("error"):
+                    self.error.emit(f"Pixiv error: {data.get('message', 'Unknown error')}")
+                    break
+
+                body = data.get("body", {})
+                illusts = body.get("illustManga", {}).get("data", [])
+
+                if not illusts:
+                    # Try alternative structure
+                    illusts = body.get("popular", {}).get("recent", [])
+
+                if not illusts:
+                    break
+
+                page_images = 0
+                for illust in illusts:
+                    if self.is_cancelled():
+                        break
+
+                    illust_id = illust.get("id", "")
+                    if not illust_id:
+                        continue
+
+                    # Get thumbnail URL
+                    thumb_url = illust.get("url", "")
+
+                    # Construct preview URL from thumbnail
+                    # Pixiv thumbnail: https://i.pximg.net/c/250x250_80_a2/img-master/...
+                    # Full preview: https://i.pximg.net/img-master/...
+                    preview_url = thumb_url
+                    if "/c/" in thumb_url:
+                        # Remove the size constraint part
+                        parts = thumb_url.split("/c/")
+                        if len(parts) > 1:
+                            after_c = parts[1]
+                            path_start = after_c.find("/")
+                            if path_start != -1:
+                                preview_url = parts[0] + after_c[path_start:]
+
+                    # Extract tags
+                    tags = illust.get("tags", [])
+                    tags_str = " ".join(tags) if isinstance(tags, list) else str(tags)
+
+                    result = ImageResult(
+                        post_id=str(illust_id),
+                        image_url=preview_url,
+                        thumbnail_url=thumb_url,
+                        preview_url=preview_url,
+                        tags=tags_str,
+                        tags_list=tags if isinstance(tags, list) else [],
+                        character="",
+                        series="",
+                        artist=illust.get("userName", ""),
+                        rating="safe",
+                        width=illust.get("width", 0),
+                        height=illust.get("height", 0),
+                        source_site="pixiv",
+                        page_url=f"{base_url}/artworks/{illust_id}"
+                    )
+
+                    if self.download_images:
+                        local_path = self._download_image(result)
+                        if local_path:
+                            result.local_path = local_path
+
+                    self.image_found.emit(result)
+                    total_images += 1
+                    page_images += 1
+
+                self.page_complete.emit(page, page_images)
+
+                if page < self.max_pages:
+                    self.msleep(2000)  # Pixiv needs longer delay
+
+            except Exception as e:
+                self.error.emit(f"Error on page {page}: {str(e)}")
                 continue
 
         return total_images

@@ -1,18 +1,19 @@
 """
-Image grid display widget with pagination.
-Shows scraped images in a responsive grid with page navigation.
+Image grid display widget with pagination and async loading.
 """
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
+from queue import Queue
+from threading import Lock
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
     QPushButton, QFrame, QSizePolicy, QMenu,
     QApplication, QFileDialog, QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QUrl
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QUrl, QThread, QObject, QTimer
 from PyQt6.QtGui import QPixmap, QImage, QFont, QDesktopServices, QCursor
 
 import requests
@@ -22,16 +23,119 @@ from .crawler_thread import ImageResult
 from .styles import AppStyles
 
 
+class ImageLoaderWorker(QObject):
+    """Worker for loading images in background thread."""
+
+    image_loaded = pyqtSignal(str, QPixmap)  # card_id, pixmap
+
+    def __init__(self):
+        super().__init__()
+        self._queue = Queue()
+        self._running = True
+        self._cache: Dict[str, QPixmap] = {}
+        self._cache_lock = Lock()
+
+    def add_task(self, card_id: str, url: str, source_site: str):
+        """Add image loading task to queue."""
+        self._queue.put((card_id, url, source_site))
+
+    def stop(self):
+        """Stop the worker."""
+        self._running = False
+        self._queue.put(None)  # Unblock queue
+
+    def process(self):
+        """Process image loading tasks."""
+        while self._running:
+            try:
+                task = self._queue.get(timeout=0.5)
+                if task is None:
+                    continue
+
+                card_id, url, source_site = task
+
+                # Check cache first
+                with self._cache_lock:
+                    if url in self._cache:
+                        self.image_loaded.emit(card_id, self._cache[url])
+                        continue
+
+                # Load image
+                try:
+                    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                    if source_site == "pixiv" or "pximg.net" in url:
+                        headers["Referer"] = "https://www.pixiv.net/"
+
+                    response = requests.get(url, headers=headers, timeout=8)
+                    response.raise_for_status()
+
+                    image = QImage()
+                    image.loadFromData(response.content)
+
+                    if not image.isNull():
+                        pixmap = QPixmap.fromImage(image)
+                        # Cache the pixmap
+                        with self._cache_lock:
+                            if len(self._cache) < 200:  # Limit cache size
+                                self._cache[url] = pixmap
+                        self.image_loaded.emit(card_id, pixmap)
+                except:
+                    pass  # Silent fail for image loading
+
+            except:
+                continue
+
+
+class ImageLoaderThread(QThread):
+    """Thread for running the image loader worker."""
+
+    image_loaded = pyqtSignal(str, QPixmap)
+
+    def __init__(self):
+        super().__init__()
+        self.worker = ImageLoaderWorker()
+        self.worker.image_loaded.connect(self.image_loaded.emit)
+
+    def run(self):
+        self.worker.process()
+
+    def add_task(self, card_id: str, url: str, source_site: str):
+        self.worker.add_task(card_id, url, source_site)
+
+    def stop(self):
+        self.worker.stop()
+        self.wait(2000)
+
+
+# Global image loader instance
+_image_loader: Optional[ImageLoaderThread] = None
+
+def get_image_loader() -> ImageLoaderThread:
+    """Get or create the global image loader."""
+    global _image_loader
+    if _image_loader is None or not _image_loader.isRunning():
+        _image_loader = ImageLoaderThread()
+        _image_loader.start()
+    return _image_loader
+
+
 class ImageCard(QFrame):
-    """Individual image card widget."""
+    """Individual image card widget with async loading."""
 
     clicked = pyqtSignal(object)
+    _card_counter = 0
 
     def __init__(self, image_result: ImageResult, parent=None):
         super().__init__(parent)
         self.image_result = image_result
         self._pixmap = None
+
+        # Generate unique card ID
+        ImageCard._card_counter += 1
+        self._card_id = f"card_{ImageCard._card_counter}"
+
         self._init_ui()
+        self._start_loading()
 
     def _init_ui(self):
         """Initialize the card UI."""
@@ -62,7 +166,7 @@ class ImageCard(QFrame):
         self.thumb_label = QLabel()
         self.thumb_label.setFixedSize(192, 180)
         self.thumb_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.thumb_label.setStyleSheet("color: #606060; background: transparent;")
+        self.thumb_label.setStyleSheet("color: #404040; background: transparent; font-size: 11px;")
         self.thumb_label.setText("Loading...")
         thumb_layout.addWidget(self.thumb_label)
 
@@ -97,9 +201,6 @@ class ImageCard(QFrame):
         meta_layout.addStretch()
         layout.addLayout(meta_layout)
 
-        # Load thumbnail
-        self._load_thumbnail()
-
     def _get_title(self) -> str:
         """Get display title for the card."""
         if self.image_result.character:
@@ -110,34 +211,28 @@ class ImageCard(QFrame):
             return ", ".join(tags)[:25]
         return f"#{self.image_result.post_id}"
 
-    def _load_thumbnail(self):
-        """Load the thumbnail image."""
+    def _start_loading(self):
+        """Start async image loading."""
+        # Check for local file first
         if self.image_result.local_path and os.path.exists(self.image_result.local_path):
             pixmap = QPixmap(self.image_result.local_path)
             if not pixmap.isNull():
                 self._set_pixmap(pixmap)
                 return
 
+        # Get URL to load
         thumb_url = self.image_result.preview_url or self.image_result.thumbnail_url
         if thumb_url:
-            try:
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-                if self.image_result.source_site == "pixiv" or "pximg.net" in thumb_url:
-                    headers["Referer"] = "https://www.pixiv.net/"
+            loader = get_image_loader()
+            loader.image_loaded.connect(self._on_image_loaded)
+            loader.add_task(self._card_id, thumb_url, self.image_result.source_site)
+        else:
+            self.thumb_label.setText("No Preview")
 
-                response = requests.get(thumb_url, headers=headers, timeout=10)
-                response.raise_for_status()
-
-                image = QImage()
-                image.loadFromData(BytesIO(response.content).getvalue())
-
-                if not image.isNull():
-                    self._set_pixmap(QPixmap.fromImage(image))
-                    return
-            except:
-                pass
-
-        self.thumb_label.setText("No Preview")
+    def _on_image_loaded(self, card_id: str, pixmap: QPixmap):
+        """Handle loaded image from worker."""
+        if card_id == self._card_id and not pixmap.isNull():
+            self._set_pixmap(pixmap)
 
     def _set_pixmap(self, pixmap: QPixmap):
         """Set and scale the thumbnail pixmap."""
@@ -165,7 +260,7 @@ class ImageCard(QFrame):
 
 
 class ImageGrid(QWidget):
-    """Grid widget with pagination."""
+    """Grid widget with pagination and async loading."""
 
     image_clicked = pyqtSignal(object)
 
@@ -175,7 +270,13 @@ class ImageGrid(QWidget):
         self.image_cards: List[ImageCard] = []
         self.current_page = 0
         self.images_per_page = 12
+        self._pending_update = False
         self._init_ui()
+
+        # Debounce timer for resize
+        self._resize_timer = QTimer()
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.timeout.connect(self._do_resize_update)
 
     def _init_ui(self):
         """Initialize the grid UI."""
@@ -253,29 +354,36 @@ class ImageGrid(QWidget):
     def _calculate_columns(self) -> int:
         """Calculate number of columns based on widget width."""
         width = self.width()
-        card_width = 208  # 200 + spacing
+        card_width = 208
         cols = max(1, width // card_width)
-        return min(cols, 6)  # Max 6 columns
+        return min(cols, 6)
 
     def _update_images_per_page(self):
         """Update images per page based on available space."""
         cols = self._calculate_columns()
-        height = self.height() - 50  # Account for header
-        card_height = 288  # 280 + spacing
+        height = self.height() - 50
+        card_height = 288
         rows = max(1, height // card_height)
-        self.images_per_page = cols * rows
+        self.images_per_page = max(6, cols * rows)
 
     def resizeEvent(self, event):
-        """Handle resize to adjust grid."""
+        """Handle resize with debounce."""
         super().resizeEvent(event)
+        self._resize_timer.start(150)  # Debounce resize
+
+    def _do_resize_update(self):
+        """Perform resize update after debounce."""
         self._update_images_per_page()
         self._show_current_page()
 
     def add_image(self, image_result: ImageResult):
         """Add an image to the collection."""
         self.all_images.append(image_result)
-        self._update_pagination()
-        self._show_current_page()
+
+        # Only update display periodically to avoid performance issues
+        if len(self.all_images) % 5 == 0 or len(self.all_images) <= 5:
+            self._update_pagination()
+            self._show_current_page()
 
     def _show_current_page(self):
         """Display images for current page."""
@@ -308,9 +416,12 @@ class ImageGrid(QWidget):
 
         self._update_count()
         self.clear_btn.setVisible(True)
+        self._update_pagination()
 
     def _update_pagination(self):
         """Update pagination controls."""
+        if self.images_per_page <= 0:
+            self.images_per_page = 12
         total_pages = max(1, (len(self.all_images) + self.images_per_page - 1) // self.images_per_page)
         self.page_label.setText(f"Page {self.current_page + 1}/{total_pages}")
         self.prev_btn.setEnabled(self.current_page > 0)
@@ -321,7 +432,6 @@ class ImageGrid(QWidget):
         if self.current_page > 0:
             self.current_page -= 1
             self._show_current_page()
-            self._update_pagination()
 
     def _next_page(self):
         """Go to next page."""
@@ -329,7 +439,6 @@ class ImageGrid(QWidget):
         if self.current_page < total_pages - 1:
             self.current_page += 1
             self._show_current_page()
-            self._update_pagination()
 
     def clear_images(self):
         """Clear all images."""

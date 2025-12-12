@@ -172,10 +172,25 @@ class AppStyles:
 
         QComboBox QAbstractItemView {
             background-color: #16213e;
-            border: 2px solid #2a2a4a;
+            border: 2px solid #e94560;
             border-radius: 8px;
             selection-background-color: #e94560;
             padding: 4px;
+            outline: none;
+        }
+
+        QComboBox QAbstractItemView::item {
+            padding: 8px 16px;
+            min-height: 24px;
+            color: #ffffff;
+        }
+
+        QComboBox QAbstractItemView::item:hover {
+            background-color: rgba(233, 69, 96, 0.3);
+        }
+
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #e94560;
         }
 
         /* SpinBox */

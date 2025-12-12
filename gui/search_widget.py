@@ -365,6 +365,20 @@ class SearchWidget(QWidget):
         if not tags:
             return
 
+        # Auto-convert spaces to underscores for booru-style search
+        # Split by comma for multiple tags, convert each
+        tag_parts = []
+        for part in tags.split(","):
+            part = part.strip()
+            if part:
+                # Replace spaces with underscores within each tag
+                tag_parts.append(part.replace(" ", "_"))
+
+        tags = " ".join(tag_parts)
+
+        # Update the search input to show the converted tags
+        self.search_input.setText(tags)
+
         site = self.site_combo.currentText().lower()
         max_pages = self.pages_spin.value()
         rating = "general" if self.rating_combo.currentIndex() == 0 else "all"

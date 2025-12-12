@@ -155,7 +155,12 @@ class ImageCard(QFrame):
         thumb_url = self.image_result.preview_url or self.image_result.thumbnail_url
         if thumb_url:
             try:
-                headers = {"User-Agent": "AnimeCharacterCrawler/1.0"}
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+                # Pixiv requires Referer header
+                if self.image_result.source_site == "pixiv" or "pximg.net" in thumb_url or "pixiv" in thumb_url:
+                    headers["Referer"] = "https://www.pixiv.net/"
+
                 response = requests.get(thumb_url, headers=headers, timeout=10)
                 response.raise_for_status()
 

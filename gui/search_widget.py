@@ -153,8 +153,8 @@ class SearchWidget(QWidget):
         filter_row.addWidget(site_label)
 
         self.site_combo = QComboBox()
-        self.site_combo.addItems(["Danbooru", "Safebooru", "Gelbooru"])
-        self.site_combo.setMinimumWidth(130)
+        self.site_combo.addItems(["Danbooru", "Safebooru", "Gelbooru", "Konachan", "Yande.re", "Zerochan", "Anime-Pictures"])
+        self.site_combo.setMinimumWidth(150)
         self.site_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         filter_row.addWidget(self.site_combo)
 
@@ -200,7 +200,7 @@ class SearchWidget(QWidget):
 
         # Download checkbox
         self.download_check = QCheckBox("Download Images")
-        self.download_check.setChecked(True)
+        self.download_check.setChecked(False)  # Disabled by default
         self.download_check.setCursor(Qt.CursorShape.PointingHandCursor)
         filter_row.addWidget(self.download_check)
 

@@ -113,6 +113,14 @@ class CrawlerThread(QThread):
                 total_images = self._crawl_safebooru()
             elif self.site == "gelbooru":
                 total_images = self._crawl_gelbooru()
+            elif self.site == "konachan":
+                total_images = self._crawl_konachan()
+            elif self.site == "yande.re":
+                total_images = self._crawl_yandere()
+            elif self.site == "zerochan":
+                total_images = self._crawl_zerochan()
+            elif self.site == "anime-pictures":
+                total_images = self._crawl_anime_pictures()
             else:
                 total_images = self._crawl_danbooru()
 
@@ -369,6 +377,329 @@ class CrawlerThread(QThread):
                         height=post.get("height", 0),
                         source_site="gelbooru",
                         page_url=f"{base_url}/index.php?page=post&s=view&id={post.get('id')}"
+                    )
+
+                    if self.download_images:
+                        local_path = self._download_image(result)
+                        if local_path:
+                            result.local_path = local_path
+
+                    self.image_found.emit(result)
+                    total_images += 1
+                    page_images += 1
+
+                self.page_complete.emit(page + 1, page_images)
+
+                if page < self.max_pages - 1:
+                    self.msleep(1000)
+
+            except Exception as e:
+                self.error.emit(f"Error on page {page + 1}: {str(e)}")
+                continue
+
+        return total_images
+
+    def _crawl_konachan(self) -> int:
+        """Crawl images from Konachan."""
+        base_url = "https://konachan.com"
+        total_images = 0
+
+        tags = self.search_tags
+        if self.rating_filter == "general":
+            tags = f"{tags} rating:safe"
+
+        for page in range(1, self.max_pages + 1):
+            if self.is_cancelled():
+                break
+
+            self.progress.emit(page, self.max_pages, f"Fetching page {page}...")
+
+            try:
+                api_url = f"{base_url}/post.json"
+                params = {
+                    "tags": tags,
+                    "page": page,
+                    "limit": 20
+                }
+
+                headers = {
+                    "User-Agent": "AnimeCharacterCrawler/1.0 (Educational Project)"
+                }
+
+                response = requests.get(api_url, params=params, headers=headers, timeout=30)
+                response.raise_for_status()
+
+                posts = response.json()
+
+                if not posts:
+                    break
+
+                page_images = 0
+                for post in posts:
+                    if self.is_cancelled():
+                        break
+
+                    file_url = post.get("file_url") or post.get("jpeg_url") or post.get("sample_url")
+                    if not file_url:
+                        continue
+
+                    result = ImageResult(
+                        post_id=str(post.get("id", "")),
+                        image_url=file_url,
+                        thumbnail_url=post.get("preview_url", ""),
+                        preview_url=post.get("sample_url", file_url),
+                        tags=post.get("tags", ""),
+                        tags_list=post.get("tags", "").split(),
+                        rating=post.get("rating", "s"),
+                        score=post.get("score", 0),
+                        width=post.get("width", 0),
+                        height=post.get("height", 0),
+                        source_site="konachan",
+                        page_url=f"{base_url}/post/show/{post.get('id')}"
+                    )
+
+                    if self.download_images:
+                        local_path = self._download_image(result)
+                        if local_path:
+                            result.local_path = local_path
+
+                    self.image_found.emit(result)
+                    total_images += 1
+                    page_images += 1
+
+                self.page_complete.emit(page, page_images)
+
+                if page < self.max_pages:
+                    self.msleep(1000)
+
+            except Exception as e:
+                self.error.emit(f"Error on page {page}: {str(e)}")
+                continue
+
+        return total_images
+
+    def _crawl_yandere(self) -> int:
+        """Crawl images from Yande.re."""
+        base_url = "https://yande.re"
+        total_images = 0
+
+        tags = self.search_tags
+        if self.rating_filter == "general":
+            tags = f"{tags} rating:safe"
+
+        for page in range(1, self.max_pages + 1):
+            if self.is_cancelled():
+                break
+
+            self.progress.emit(page, self.max_pages, f"Fetching page {page}...")
+
+            try:
+                api_url = f"{base_url}/post.json"
+                params = {
+                    "tags": tags,
+                    "page": page,
+                    "limit": 20
+                }
+
+                headers = {
+                    "User-Agent": "AnimeCharacterCrawler/1.0 (Educational Project)"
+                }
+
+                response = requests.get(api_url, params=params, headers=headers, timeout=30)
+                response.raise_for_status()
+
+                posts = response.json()
+
+                if not posts:
+                    break
+
+                page_images = 0
+                for post in posts:
+                    if self.is_cancelled():
+                        break
+
+                    file_url = post.get("file_url") or post.get("jpeg_url") or post.get("sample_url")
+                    if not file_url:
+                        continue
+
+                    result = ImageResult(
+                        post_id=str(post.get("id", "")),
+                        image_url=file_url,
+                        thumbnail_url=post.get("preview_url", ""),
+                        preview_url=post.get("sample_url", file_url),
+                        tags=post.get("tags", ""),
+                        tags_list=post.get("tags", "").split(),
+                        rating=post.get("rating", "s"),
+                        score=post.get("score", 0),
+                        width=post.get("width", 0),
+                        height=post.get("height", 0),
+                        source_site="yandere",
+                        page_url=f"{base_url}/post/show/{post.get('id')}"
+                    )
+
+                    if self.download_images:
+                        local_path = self._download_image(result)
+                        if local_path:
+                            result.local_path = local_path
+
+                    self.image_found.emit(result)
+                    total_images += 1
+                    page_images += 1
+
+                self.page_complete.emit(page, page_images)
+
+                if page < self.max_pages:
+                    self.msleep(1000)
+
+            except Exception as e:
+                self.error.emit(f"Error on page {page}: {str(e)}")
+                continue
+
+        return total_images
+
+    def _crawl_zerochan(self) -> int:
+        """Crawl images from Zerochan."""
+        base_url = "https://www.zerochan.net"
+        total_images = 0
+
+        # Zerochan uses different URL structure
+        search_term = self.search_tags.replace(" ", "+").replace("_", "+")
+
+        for page in range(1, self.max_pages + 1):
+            if self.is_cancelled():
+                break
+
+            self.progress.emit(page, self.max_pages, f"Fetching page {page}...")
+
+            try:
+                # Zerochan has a JSON API
+                api_url = f"{base_url}/{search_term}?json&p={page}&l=20"
+
+                headers = {
+                    "User-Agent": "AnimeCharacterCrawler/1.0 (Educational Project)"
+                }
+
+                response = requests.get(api_url, headers=headers, timeout=30)
+                response.raise_for_status()
+
+                data = response.json()
+                posts = data.get("items", [])
+
+                if not posts:
+                    break
+
+                page_images = 0
+                for post in posts:
+                    if self.is_cancelled():
+                        break
+
+                    # Zerochan image URL pattern
+                    post_id = post.get("id", "")
+                    thumbnail = post.get("thumbnail", "")
+
+                    # Construct full image URL from thumbnail
+                    if thumbnail:
+                        # Replace thumbnail path with full image path
+                        file_url = thumbnail.replace("/240/", "/full/").replace(".240.", ".full.")
+                    else:
+                        continue
+
+                    result = ImageResult(
+                        post_id=str(post_id),
+                        image_url=file_url,
+                        thumbnail_url=thumbnail,
+                        preview_url=file_url,
+                        tags=post.get("tag", ""),
+                        tags_list=post.get("tag", "").split() if post.get("tag") else [],
+                        rating="safe",
+                        width=post.get("width", 0),
+                        height=post.get("height", 0),
+                        source_site="zerochan",
+                        page_url=f"{base_url}/{post_id}"
+                    )
+
+                    if self.download_images:
+                        local_path = self._download_image(result)
+                        if local_path:
+                            result.local_path = local_path
+
+                    self.image_found.emit(result)
+                    total_images += 1
+                    page_images += 1
+
+                self.page_complete.emit(page, page_images)
+
+                if page < self.max_pages:
+                    self.msleep(1500)  # Zerochan needs more delay
+
+            except Exception as e:
+                self.error.emit(f"Error on page {page}: {str(e)}")
+                continue
+
+        return total_images
+
+    def _crawl_anime_pictures(self) -> int:
+        """Crawl images from Anime-Pictures.net."""
+        base_url = "https://anime-pictures.net"
+        total_images = 0
+
+        search_term = self.search_tags.replace(" ", "+")
+
+        for page in range(self.max_pages):
+            if self.is_cancelled():
+                break
+
+            self.progress.emit(page + 1, self.max_pages, f"Fetching page {page + 1}...")
+
+            try:
+                # Anime-Pictures API
+                api_url = f"{base_url}/api/v3/posts"
+                params = {
+                    "page": page,
+                    "search_tag": search_term,
+                    "posts_per_page": 20,
+                    "lang": "en"
+                }
+
+                headers = {
+                    "User-Agent": "AnimeCharacterCrawler/1.0 (Educational Project)"
+                }
+
+                response = requests.get(api_url, params=params, headers=headers, timeout=30)
+                response.raise_for_status()
+
+                data = response.json()
+                posts = data.get("posts", [])
+
+                if not posts:
+                    break
+
+                page_images = 0
+                for post in posts:
+                    if self.is_cancelled():
+                        break
+
+                    post_id = post.get("id", "")
+                    # Build image URLs
+                    file_url = f"{base_url}/images/{post.get('file_path', '')}"
+                    preview_url = f"{base_url}/previews/{post.get('preview_path', '')}"
+
+                    if not post.get("file_path"):
+                        continue
+
+                    result = ImageResult(
+                        post_id=str(post_id),
+                        image_url=file_url,
+                        thumbnail_url=preview_url,
+                        preview_url=preview_url,
+                        tags=" ".join(post.get("tags", [])) if isinstance(post.get("tags"), list) else post.get("tags", ""),
+                        tags_list=post.get("tags", []) if isinstance(post.get("tags"), list) else [],
+                        rating="safe" if post.get("ero", 0) == 0 else "explicit",
+                        score=post.get("star_count", 0),
+                        width=post.get("width", 0),
+                        height=post.get("height", 0),
+                        source_site="anime-pictures",
+                        page_url=f"{base_url}/posts/{post_id}"
                     )
 
                     if self.download_images:

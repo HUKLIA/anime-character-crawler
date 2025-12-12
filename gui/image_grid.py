@@ -151,8 +151,8 @@ class ImageCard(QFrame):
                 self._set_pixmap(pixmap)
                 return
 
-        # Try to load from thumbnail URL
-        thumb_url = self.image_result.thumbnail_url or self.image_result.preview_url
+        # Use preview URL for better quality, fallback to thumbnail
+        thumb_url = self.image_result.preview_url or self.image_result.thumbnail_url
         if thumb_url:
             try:
                 headers = {"User-Agent": "AnimeCharacterCrawler/1.0"}

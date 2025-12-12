@@ -36,8 +36,10 @@ class ImageDetailDialog(QDialog):
     def _init_ui(self):
         """Initialize the dialog UI."""
         self.setWindowTitle("Image Details")
-        self.setMinimumSize(900, 700)
-        self.setModal(True)
+        self.setMinimumSize(700, 500)
+        self.resize(1000, 700)
+        # Allow resizing
+        self.setSizeGripEnabled(True)
         self.setStyleSheet("""
             QDialog {
                 background-color: #0f0f1a;
@@ -50,6 +52,9 @@ class ImageDetailDialog(QDialog):
                 padding: 10px 20px;
                 font-size: 13px;
                 font-weight: bold;
+            }
+            QSizeGrip {
+                background: transparent;
             }
         """)
 
@@ -251,10 +256,16 @@ class ImageDetailDialog(QDialog):
     def _load_image(self):
         """Load the preview image."""
         # Use preview_url for better quality, fallback to thumbnail
-        image_url = self.image_result.preview_url or self.image_result.image_url
+        image_url = self.image_result.preview_url or self.image_result.thumbnail_url or self.image_result.image_url
 
         try:
-            headers = {"User-Agent": "AnimeCharacterCrawler/1.0"}
+            # Set proper headers based on source site
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+            # Pixiv requires Referer header
+            if self.image_result.source_site == "pixiv" or "pximg.net" in image_url or "pixiv" in image_url:
+                headers["Referer"] = "https://www.pixiv.net/"
+
             response = requests.get(image_url, headers=headers, timeout=30)
             response.raise_for_status()
 
@@ -265,18 +276,31 @@ class ImageDetailDialog(QDialog):
             if not image.isNull():
                 pixmap = QPixmap.fromImage(image)
                 self._pixmap = pixmap
-
-                # Scale to fit the label while maintaining aspect ratio
-                scaled = pixmap.scaled(
-                    550, 500,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                )
-                self.image_label.setPixmap(scaled)
+                self._update_image_display()
             else:
                 self.image_label.setText("Failed to load image")
         except Exception as e:
             self.image_label.setText(f"Error: {str(e)[:50]}")
+
+    def _update_image_display(self):
+        """Update image display based on current dialog size."""
+        if self._pixmap:
+            # Get available size for image
+            available_width = self.width() - 380  # Account for info panel and margins
+            available_height = self.height() - 120  # Account for buttons and margins
+
+            scaled = self._pixmap.scaled(
+                max(400, available_width),
+                max(300, available_height),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.image_label.setPixmap(scaled)
+
+    def resizeEvent(self, event):
+        """Handle dialog resize to update image scaling."""
+        super().resizeEvent(event)
+        self._update_image_display()
 
     def _copy_url(self):
         """Copy image URL to clipboard."""

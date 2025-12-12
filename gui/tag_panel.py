@@ -17,12 +17,60 @@ from .crawler_thread import ImageResult
 from .styles import AppStyles
 
 
-class FlowLayout(QVBoxLayout):
-    """Simple flow layout that wraps widgets."""
+class FlowWidget(QWidget):
+    """Widget that arranges children in a flow layout (wrapping)."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setSpacing(8)
+        self._widgets = []
+        self._h_spacing = 6
+        self._v_spacing = 6
+
+    def add_widget(self, widget):
+        """Add a widget to the flow."""
+        widget.setParent(self)
+        self._widgets.append(widget)
+        widget.show()
+        self._do_layout()
+
+    def clear_widgets(self):
+        """Remove all widgets."""
+        for w in self._widgets:
+            w.setParent(None)
+            w.deleteLater()
+        self._widgets.clear()
+        self._do_layout()
+
+    def _do_layout(self):
+        """Arrange widgets in flow layout."""
+        if not self._widgets:
+            self.setMinimumHeight(30)
+            return
+
+        x = 0
+        y = 0
+        row_height = 0
+        width = self.parent().width() - 20 if self.parent() else 250
+
+        for widget in self._widgets:
+            widget_size = widget.sizeHint()
+            widget_width = widget_size.width()
+            widget_height = widget_size.height()
+
+            if x + widget_width > width and x > 0:
+                x = 0
+                y += row_height + self._v_spacing
+                row_height = 0
+
+            widget.setGeometry(x, y, widget_width, widget_height)
+            x += widget_width + self._h_spacing
+            row_height = max(row_height, widget_height)
+
+        self.setMinimumHeight(y + row_height + 10)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._do_layout()
 
 
 class TagButton(QPushButton):
@@ -114,26 +162,26 @@ class TagSection(QFrame):
         self.setStyleSheet("""
             QFrame {
                 background-color: #16213e;
-                border-radius: 12px;
+                border-radius: 8px;
                 border: none;
-                padding: 12px;
             }
         """)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(8)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(6)
+        layout.setContentsMargins(10, 8, 10, 8)
 
         # Header
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(4)
 
         title_label = QLabel(f"{self.icon} {self.title}")
-        title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         title_label.setStyleSheet(f"color: {self._get_category_color()}; background: transparent;")
         header_layout.addWidget(title_label)
 
         self.count_label = QLabel("(0)")
-        self.count_label.setStyleSheet("color: #a0a0a0; background: transparent;")
+        self.count_label.setStyleSheet("color: #a0a0a0; font-size: 10px; background: transparent;")
         header_layout.addWidget(self.count_label)
 
         header_layout.addStretch()
@@ -145,8 +193,8 @@ class TagSection(QFrame):
                 background: transparent;
                 color: #a0a0a0;
                 border: none;
-                font-size: 11px;
-                padding: 4px 8px;
+                font-size: 10px;
+                padding: 2px 6px;
             }
             QPushButton:hover {
                 color: #e94560;
@@ -159,25 +207,32 @@ class TagSection(QFrame):
 
         layout.addLayout(header_layout)
 
-        # Tags container (flow layout)
-        self.tags_widget = QWidget()
-        self.tags_widget.setStyleSheet("background: transparent;")
-        self.tags_layout = QHBoxLayout(self.tags_widget)
-        self.tags_layout.setSpacing(8)
-        self.tags_layout.setContentsMargins(0, 0, 0, 0)
-        self.tags_layout.addStretch()
+        # Tags container - use a widget with wrap-style layout
+        self.tags_container = QWidget()
+        self.tags_container.setStyleSheet("background: transparent;")
+        self.tags_flow = FlowWidget(self.tags_container)
 
-        # Wrap in scroll area for horizontal scrolling
+        # Scroll area for tags
         scroll = QScrollArea()
-        scroll.setWidget(self.tags_widget)
+        scroll.setWidget(self.tags_container)
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setMaximumHeight(60)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setMinimumHeight(40)
+        scroll.setMaximumHeight(80)
         scroll.setStyleSheet("""
             QScrollArea {
                 border: none;
                 background: transparent;
+            }
+            QScrollBar:vertical {
+                background: #1a1a2e;
+                width: 6px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical {
+                background: #3a3a5a;
+                border-radius: 3px;
             }
         """)
 
@@ -185,7 +240,8 @@ class TagSection(QFrame):
 
         # Empty message
         self.empty_label = QLabel("No tags yet")
-        self.empty_label.setStyleSheet("color: #a0a0a0; font-size: 11px; background: transparent;")
+        self.empty_label.setStyleSheet("color: #606060; font-size: 10px; background: transparent;")
+        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.empty_label)
 
     def _get_category_color(self) -> str:
@@ -212,20 +268,18 @@ class TagSection(QFrame):
     def _rebuild_buttons(self):
         """Rebuild tag buttons based on current tags."""
         # Clear existing buttons
-        for btn in self.tag_buttons:
-            self.tags_layout.removeWidget(btn)
-            btn.deleteLater()
+        self.tags_flow.clear_widgets()
         self.tag_buttons.clear()
 
         # Sort by count (most popular first)
         sorted_tags = sorted(self.tags.items(), key=lambda x: -x[1])
 
-        # Create buttons (limit to top 20)
-        for tag, count in sorted_tags[:20]:
+        # Create buttons (limit to top 15)
+        for tag, count in sorted_tags[:15]:
             btn = TagButton(tag, self.category, count)
             btn.tag_clicked.connect(lambda t, c: self.tag_selected.emit(t, c))
             self.tag_buttons.append(btn)
-            self.tags_layout.insertWidget(self.tags_layout.count() - 1, btn)
+            self.tags_flow.add_widget(btn)
 
         # Update UI state
         self.count_label.setText(f"({len(self.tags)})")
@@ -235,7 +289,11 @@ class TagSection(QFrame):
     def clear_tags(self):
         """Clear all tags."""
         self.tags.clear()
-        self._rebuild_buttons()
+        self.tags_flow.clear_widgets()
+        self.tag_buttons.clear()
+        self.count_label.setText("(0)")
+        self.empty_label.setVisible(True)
+        self.clear_btn.setVisible(False)
 
 
 class TagPanel(QWidget):

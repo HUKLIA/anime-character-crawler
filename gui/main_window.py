@@ -45,8 +45,10 @@ class MainWindow(QMainWindow):
     def _init_ui(self):
         """Initialize the main UI."""
         self.setWindowTitle("Anime Character Crawler")
-        self.setMinimumSize(1200, 800)
-        self.resize(1400, 900)
+        self.setMinimumSize(900, 600)
+        # Auto-size to screen
+        screen = QApplication.primaryScreen().geometry()
+        self.resize(int(screen.width() * 0.85), int(screen.height() * 0.85))
 
         # Apply stylesheet
         self.setStyleSheet(AppStyles.MAIN_STYLESHEET)
@@ -56,10 +58,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         main_layout = QVBoxLayout(central)
-        main_layout.setSpacing(16)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(4)
+        main_layout.setContentsMargins(8, 4, 8, 4)
 
-        # Search widget at top
+        # Search widget at top (compact)
         self.search_widget = SearchWidget()
         main_layout.addWidget(self.search_widget)
 
@@ -75,10 +77,10 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        # Left side - Tag panel
+        # Left side - Tag panel (collapsible)
         self.tag_panel = TagPanel()
-        self.tag_panel.setMinimumWidth(280)
-        self.tag_panel.setMaximumWidth(400)
+        self.tag_panel.setMinimumWidth(200)
+        self.tag_panel.setMaximumWidth(280)
         content_splitter.addWidget(self.tag_panel)
 
         # Right side - Image grid
@@ -86,11 +88,11 @@ class MainWindow(QMainWindow):
         content_splitter.addWidget(self.image_grid)
 
         # Set splitter sizes (tag panel smaller)
-        content_splitter.setSizes([300, 900])
+        content_splitter.setSizes([220, 900])
         content_splitter.setStretchFactor(0, 0)
         content_splitter.setStretchFactor(1, 1)
 
-        main_layout.addWidget(content_splitter)
+        main_layout.addWidget(content_splitter, 1)  # Stretch factor 1 to take remaining space
 
         # Status bar
         self._create_status_bar()
@@ -342,11 +344,13 @@ class MainWindow(QMainWindow):
             except:
                 pass
 
+        # Use project folder for downloads
+        project_dir = Path(__file__).parent.parent / "downloaded_images"
         return {
-            "download_dir": str(Path.home() / "Downloads" / "AnimeImages"),
+            "download_dir": str(project_dir),
             "max_concurrent": 1,
             "download_delay": 3.0,
-            "auto_download": True,
+            "auto_download": False,  # Off by default
             "skip_duplicates": True,
             "min_width": 200,
             "min_height": 200,

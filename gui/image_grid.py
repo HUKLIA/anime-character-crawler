@@ -1,6 +1,6 @@
 """
-Image grid display widget.
-Shows scraped images in a responsive grid with thumbnails and metadata.
+Image grid display widget with pagination.
+Shows scraped images in a responsive grid with page navigation.
 """
 
 import os
@@ -9,7 +9,7 @@ from typing import Optional, List
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
-    QPushButton, QFrame, QScrollArea, QSizePolicy, QMenu,
+    QPushButton, QFrame, QSizePolicy, QMenu,
     QApplication, QFileDialog, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QUrl
@@ -23,12 +23,9 @@ from .styles import AppStyles
 
 
 class ImageCard(QFrame):
-    """
-    Individual image card widget showing thumbnail and metadata.
-    """
+    """Individual image card widget."""
 
-    clicked = pyqtSignal(object)  # ImageResult
-    download_requested = pyqtSignal(object)  # ImageResult
+    clicked = pyqtSignal(object)
 
     def __init__(self, image_result: ImageResult, parent=None):
         super().__init__(parent)
@@ -38,12 +35,12 @@ class ImageCard(QFrame):
 
     def _init_ui(self):
         """Initialize the card UI."""
-        self.setFixedSize(300, 400)
+        self.setFixedSize(200, 280)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet("""
             QFrame {
                 background-color: #16213e;
-                border-radius: 12px;
+                border-radius: 8px;
                 border: 2px solid #2a2a4a;
             }
             QFrame:hover {
@@ -52,78 +49,53 @@ class ImageCard(QFrame):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(8)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        layout.setContentsMargins(4, 4, 4, 4)
 
-        # Thumbnail container
+        # Thumbnail
         thumb_container = QFrame()
-        thumb_container.setFixedSize(284, 280)
-        thumb_container.setStyleSheet("""
-            QFrame {
-                background-color: #1a1a2e;
-                border-radius: 8px;
-                border: none;
-            }
-        """)
+        thumb_container.setFixedSize(192, 180)
+        thumb_container.setStyleSheet("background-color: #1a1a2e; border-radius: 6px; border: none;")
         thumb_layout = QVBoxLayout(thumb_container)
         thumb_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Thumbnail image
         self.thumb_label = QLabel()
-        self.thumb_label.setFixedSize(284, 280)
+        self.thumb_label.setFixedSize(192, 180)
         self.thumb_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.thumb_label.setStyleSheet("background: transparent; border: none;")
+        self.thumb_label.setStyleSheet("color: #606060; background: transparent;")
         self.thumb_label.setText("Loading...")
-        self.thumb_label.setStyleSheet("color: #a0a0a0; background: transparent;")
         thumb_layout.addWidget(self.thumb_label)
 
         layout.addWidget(thumb_container)
 
-        # Info section
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(4)
-
-        # Title (character or first tags)
+        # Title
         title_text = self._get_title()
         self.title_label = QLabel(title_text)
-        self.title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        self.title_label.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         self.title_label.setStyleSheet("color: #ffffff; border: none; background: transparent;")
         self.title_label.setWordWrap(True)
-        self.title_label.setMaximumHeight(40)
-        info_layout.addWidget(self.title_label)
+        self.title_label.setMaximumHeight(32)
+        layout.addWidget(self.title_label)
 
         # Metadata row
         meta_layout = QHBoxLayout()
-        meta_layout.setSpacing(8)
+        meta_layout.setSpacing(4)
 
-        # Site badge
-        site_label = QLabel(self.image_result.source_site.capitalize())
+        site_label = QLabel(self.image_result.source_site.capitalize()[:6])
         site_label.setStyleSheet("""
-            color: #e94560;
-            font-size: 10px;
+            color: #e94560; font-size: 9px;
             background-color: rgba(233, 69, 96, 0.2);
-            border-radius: 4px;
-            padding: 2px 6px;
-            border: none;
+            border-radius: 3px; padding: 1px 4px; border: none;
         """)
         meta_layout.addWidget(site_label)
 
-        # Score
-        if self.image_result.score:
-            score_label = QLabel(f"⭐ {self.image_result.score}")
-            score_label.setStyleSheet("color: #ffc107; font-size: 10px; border: none; background: transparent;")
-            meta_layout.addWidget(score_label)
-
-        # Dimensions
         if self.image_result.width and self.image_result.height:
             dim_label = QLabel(f"{self.image_result.width}x{self.image_result.height}")
-            dim_label.setStyleSheet("color: #a0a0a0; font-size: 10px; border: none; background: transparent;")
+            dim_label.setStyleSheet("color: #606060; font-size: 9px; border: none; background: transparent;")
             meta_layout.addWidget(dim_label)
 
         meta_layout.addStretch()
-        info_layout.addLayout(meta_layout)
-
-        layout.addLayout(info_layout)
+        layout.addLayout(meta_layout)
 
         # Load thumbnail
         self._load_thumbnail()
@@ -131,165 +103,129 @@ class ImageCard(QFrame):
     def _get_title(self) -> str:
         """Get display title for the card."""
         if self.image_result.character:
-            # Clean up character name
             chars = self.image_result.character.replace("_", " ")
-            return chars[:30] + "..." if len(chars) > 30 else chars
-
+            return chars[:25] + "..." if len(chars) > 25 else chars
         if self.image_result.tags_list:
-            # Use first few tags
-            tags = [t.replace("_", " ") for t in self.image_result.tags_list[:3]]
-            return ", ".join(tags)[:30]
-
-        return f"Image #{self.image_result.post_id}"
+            tags = [t.replace("_", " ") for t in self.image_result.tags_list[:2]]
+            return ", ".join(tags)[:25]
+        return f"#{self.image_result.post_id}"
 
     def _load_thumbnail(self):
         """Load the thumbnail image."""
-        # Try to load from local file first
         if self.image_result.local_path and os.path.exists(self.image_result.local_path):
             pixmap = QPixmap(self.image_result.local_path)
             if not pixmap.isNull():
                 self._set_pixmap(pixmap)
                 return
 
-        # Use preview URL for better quality, fallback to thumbnail
         thumb_url = self.image_result.preview_url or self.image_result.thumbnail_url
         if thumb_url:
             try:
                 headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
-                # Pixiv requires Referer header
-                if self.image_result.source_site == "pixiv" or "pximg.net" in thumb_url or "pixiv" in thumb_url:
+                if self.image_result.source_site == "pixiv" or "pximg.net" in thumb_url:
                     headers["Referer"] = "https://www.pixiv.net/"
 
                 response = requests.get(thumb_url, headers=headers, timeout=10)
                 response.raise_for_status()
 
-                image_data = BytesIO(response.content)
                 image = QImage()
-                image.loadFromData(image_data.getvalue())
+                image.loadFromData(BytesIO(response.content).getvalue())
 
                 if not image.isNull():
-                    pixmap = QPixmap.fromImage(image)
-                    self._set_pixmap(pixmap)
+                    self._set_pixmap(QPixmap.fromImage(image))
                     return
             except:
                 pass
 
-        # Show placeholder
         self.thumb_label.setText("No Preview")
-        self.thumb_label.setStyleSheet("color: #a0a0a0; background: #1a1a2e;")
 
     def _set_pixmap(self, pixmap: QPixmap):
         """Set and scale the thumbnail pixmap."""
         self._pixmap = pixmap
-        scaled = pixmap.scaled(
-            284, 280,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
+        scaled = pixmap.scaled(192, 180, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.thumb_label.setPixmap(scaled)
 
     def mousePressEvent(self, event):
-        """Handle mouse click."""
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.image_result)
         super().mousePressEvent(event)
 
     def contextMenuEvent(self, event):
-        """Show context menu on right-click."""
         menu = QMenu(self)
         menu.setStyleSheet("""
-            QMenu {
-                background-color: #16213e;
-                border: 1px solid #2a2a4a;
-                border-radius: 8px;
-                padding: 8px;
-            }
-            QMenu::item {
-                padding: 8px 24px;
-                border-radius: 4px;
-                color: #ffffff;
-            }
-            QMenu::item:selected {
-                background-color: #e94560;
-            }
+            QMenu { background-color: #16213e; border: 1px solid #2a2a4a; border-radius: 6px; padding: 4px; }
+            QMenu::item { padding: 6px 16px; border-radius: 3px; color: #ffffff; }
+            QMenu::item:selected { background-color: #e94560; }
         """)
-
-        # Open in browser
-        open_action = menu.addAction("🌐 Open in Browser")
-        open_action.triggered.connect(self._open_in_browser)
-
-        # Copy URL
-        copy_action = menu.addAction("📋 Copy Image URL")
-        copy_action.triggered.connect(self._copy_url)
-
-        # Open local file
-        if self.image_result.local_path:
-            open_local = menu.addAction("📁 Open Downloaded File")
-            open_local.triggered.connect(self._open_local)
-
+        open_action = menu.addAction("Open in Browser")
+        open_action.triggered.connect(lambda: QDesktopServices.openUrl(QUrl(self.image_result.page_url or self.image_result.image_url)))
+        copy_action = menu.addAction("Copy Image URL")
+        copy_action.triggered.connect(lambda: QApplication.clipboard().setText(self.image_result.image_url))
         menu.exec(event.globalPos())
-
-    def _open_in_browser(self):
-        """Open the post page in browser."""
-        url = self.image_result.page_url or self.image_result.image_url
-        if url:
-            QDesktopServices.openUrl(QUrl(url))
-
-    def _copy_url(self):
-        """Copy image URL to clipboard."""
-        clipboard = QApplication.clipboard()
-        clipboard.setText(self.image_result.image_url)
-
-    def _open_local(self):
-        """Open the downloaded file."""
-        if self.image_result.local_path and os.path.exists(self.image_result.local_path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self.image_result.local_path))
 
 
 class ImageGrid(QWidget):
-    """
-    Grid widget displaying multiple image cards.
-    """
+    """Grid widget with pagination."""
 
-    image_clicked = pyqtSignal(object)  # ImageResult
+    image_clicked = pyqtSignal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.all_images: List[ImageResult] = []
         self.image_cards: List[ImageCard] = []
-        self.columns = 3
+        self.current_page = 0
+        self.images_per_page = 12
         self._init_ui()
 
     def _init_ui(self):
         """Initialize the grid UI."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(4)
 
-        # Header with count
+        # Header with count and pagination
         header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(8, 8, 8, 8)
+        header_layout.setContentsMargins(4, 4, 4, 4)
 
         self.count_label = QLabel("No images yet")
-        self.count_label.setStyleSheet("color: #a0a0a0; font-size: 14px;")
+        self.count_label.setStyleSheet("color: #a0a0a0; font-size: 12px;")
         header_layout.addWidget(self.count_label)
 
         header_layout.addStretch()
 
+        # Pagination controls
+        self.prev_btn = QPushButton("◀ Prev")
+        self.prev_btn.setFixedSize(70, 26)
+        self.prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.prev_btn.setStyleSheet("""
+            QPushButton { background-color: #2a2a4a; color: #ffffff; border: none; border-radius: 4px; font-size: 11px; }
+            QPushButton:hover { background-color: #3a3a5a; }
+            QPushButton:disabled { background-color: #1a1a2e; color: #404040; }
+        """)
+        self.prev_btn.clicked.connect(self._prev_page)
+        self.prev_btn.setEnabled(False)
+        header_layout.addWidget(self.prev_btn)
+
+        self.page_label = QLabel("Page 1/1")
+        self.page_label.setStyleSheet("color: #a0a0a0; font-size: 11px; padding: 0 8px;")
+        header_layout.addWidget(self.page_label)
+
+        self.next_btn = QPushButton("Next ▶")
+        self.next_btn.setFixedSize(70, 26)
+        self.next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.next_btn.setStyleSheet(self.prev_btn.styleSheet())
+        self.next_btn.clicked.connect(self._next_page)
+        self.next_btn.setEnabled(False)
+        header_layout.addWidget(self.next_btn)
+
+        header_layout.addSpacing(10)
+
         # Clear button
         self.clear_btn = QPushButton("Clear All")
+        self.clear_btn.setFixedSize(70, 26)
         self.clear_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #e94560;
-                border: 1px solid #e94560;
-                border-radius: 8px;
-                padding: 6px 16px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: rgba(233, 69, 96, 0.2);
-            }
+            QPushButton { background-color: transparent; color: #e94560; border: 1px solid #e94560; border-radius: 4px; font-size: 11px; }
+            QPushButton:hover { background-color: rgba(233, 69, 96, 0.2); }
         """)
         self.clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.clear_btn.clicked.connect(self.clear_images)
@@ -298,68 +234,119 @@ class ImageGrid(QWidget):
 
         layout.addLayout(header_layout)
 
-        # Scroll area for grid
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
         # Grid container
         self.grid_widget = QWidget()
+        self.grid_widget.setStyleSheet("background: transparent;")
         self.grid_layout = QGridLayout(self.grid_widget)
-        self.grid_layout.setSpacing(16)
-        self.grid_layout.setContentsMargins(8, 8, 8, 8)
+        self.grid_layout.setSpacing(8)
+        self.grid_layout.setContentsMargins(4, 4, 4, 4)
         self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
-        scroll.setWidget(self.grid_widget)
-        layout.addWidget(scroll)
+        layout.addWidget(self.grid_widget, 1)
 
         # Empty state
-        self.empty_label = QLabel("🔍 Search for anime images to get started!")
+        self.empty_label = QLabel("Search for anime images to get started")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setStyleSheet("""
-            color: #a0a0a0;
-            font-size: 16px;
-            padding: 60px;
-        """)
-        self.grid_layout.addWidget(self.empty_label, 0, 0, 1, 4)
+        self.empty_label.setStyleSheet("color: #606060; font-size: 14px; padding: 40px;")
+        self.grid_layout.addWidget(self.empty_label, 0, 0, 1, 6)
+
+    def _calculate_columns(self) -> int:
+        """Calculate number of columns based on widget width."""
+        width = self.width()
+        card_width = 208  # 200 + spacing
+        cols = max(1, width // card_width)
+        return min(cols, 6)  # Max 6 columns
+
+    def _update_images_per_page(self):
+        """Update images per page based on available space."""
+        cols = self._calculate_columns()
+        height = self.height() - 50  # Account for header
+        card_height = 288  # 280 + spacing
+        rows = max(1, height // card_height)
+        self.images_per_page = cols * rows
+
+    def resizeEvent(self, event):
+        """Handle resize to adjust grid."""
+        super().resizeEvent(event)
+        self._update_images_per_page()
+        self._show_current_page()
 
     def add_image(self, image_result: ImageResult):
-        """Add an image to the grid."""
-        # Hide empty state
-        if self.empty_label.isVisible():
-            self.empty_label.setVisible(False)
+        """Add an image to the collection."""
+        self.all_images.append(image_result)
+        self._update_pagination()
+        self._show_current_page()
 
-        # Create card
-        card = ImageCard(image_result)
-        card.clicked.connect(lambda r: self.image_clicked.emit(r))
-        self.image_cards.append(card)
-
-        # Calculate position
-        count = len(self.image_cards)
-        row = (count - 1) // self.columns
-        col = (count - 1) % self.columns
-
-        self.grid_layout.addWidget(card, row, col)
-
-        # Update count
-        self._update_count()
-        self.clear_btn.setVisible(True)
-
-    def clear_images(self):
-        """Clear all images from the grid."""
+    def _show_current_page(self):
+        """Display images for current page."""
+        # Clear existing cards
         for card in self.image_cards:
             self.grid_layout.removeWidget(card)
             card.deleteLater()
-
         self.image_cards.clear()
+
+        if not self.all_images:
+            self.empty_label.setVisible(True)
+            return
+
+        self.empty_label.setVisible(False)
+
+        # Calculate page range
+        start_idx = self.current_page * self.images_per_page
+        end_idx = min(start_idx + self.images_per_page, len(self.all_images))
+        page_images = self.all_images[start_idx:end_idx]
+
+        # Create cards
+        cols = self._calculate_columns()
+        for i, img in enumerate(page_images):
+            card = ImageCard(img)
+            card.clicked.connect(lambda r: self.image_clicked.emit(r))
+            self.image_cards.append(card)
+            row = i // cols
+            col = i % cols
+            self.grid_layout.addWidget(card, row, col)
+
+        self._update_count()
+        self.clear_btn.setVisible(True)
+
+    def _update_pagination(self):
+        """Update pagination controls."""
+        total_pages = max(1, (len(self.all_images) + self.images_per_page - 1) // self.images_per_page)
+        self.page_label.setText(f"Page {self.current_page + 1}/{total_pages}")
+        self.prev_btn.setEnabled(self.current_page > 0)
+        self.next_btn.setEnabled(self.current_page < total_pages - 1)
+
+    def _prev_page(self):
+        """Go to previous page."""
+        if self.current_page > 0:
+            self.current_page -= 1
+            self._show_current_page()
+            self._update_pagination()
+
+    def _next_page(self):
+        """Go to next page."""
+        total_pages = (len(self.all_images) + self.images_per_page - 1) // self.images_per_page
+        if self.current_page < total_pages - 1:
+            self.current_page += 1
+            self._show_current_page()
+            self._update_pagination()
+
+    def clear_images(self):
+        """Clear all images."""
+        for card in self.image_cards:
+            self.grid_layout.removeWidget(card)
+            card.deleteLater()
+        self.image_cards.clear()
+        self.all_images.clear()
+        self.current_page = 0
         self.empty_label.setVisible(True)
         self._update_count()
+        self._update_pagination()
         self.clear_btn.setVisible(False)
 
     def _update_count(self):
         """Update the image count label."""
-        count = len(self.image_cards)
+        count = len(self.all_images)
         if count == 0:
             self.count_label.setText("No images yet")
         elif count == 1:
@@ -368,18 +355,5 @@ class ImageGrid(QWidget):
             self.count_label.setText(f"{count} images found")
 
     def get_image_count(self) -> int:
-        """Get number of images in the grid."""
-        return len(self.image_cards)
-
-    def set_columns(self, columns: int):
-        """Set number of columns in the grid."""
-        if columns != self.columns:
-            self.columns = columns
-            self._relayout()
-
-    def _relayout(self):
-        """Re-layout all cards after column change."""
-        for i, card in enumerate(self.image_cards):
-            row = i // self.columns
-            col = i % self.columns
-            self.grid_layout.addWidget(card, row, col)
+        """Get number of images."""
+        return len(self.all_images)
